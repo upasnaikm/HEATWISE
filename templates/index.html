@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HeatWise — Local Heat Alert Learning Dashboard</title>
+  
+  <!-- Inter & Mono Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js CDN (with native Canvas fallback engine for 100% offline resilience) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Leaflet CDN for Geographical Heat Risk Map (with automatic offline vector fallback) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+  <!-- Top Bar: Indian Public Health & Disaster Management Context -->
+  <header class="gov-header-bar">
+    <div class="gov-header-content">
+      <div class="app-branding">
+        <div class="app-logo-badge" title="HeatWise Local Epidemiological Threshold Learner">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+            <path d="M12 9v6" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="app-title">
+            HeatWise
+            <span class="app-title-tag">Shital &amp; Sajag Bharat</span>
+          </h1>
+          <p class="app-subtitle">Local Heat Alert Learning System • India Epidemiological Decision-Support</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="gov-context-pill">
+          🏛️ Public Health &amp; Disaster Management Decision-Support
+        </span>
+        <button id="btnPrintReport" class="btn-subtle text-xs" title="Generate print/PDF report for health & disaster authorities">
+          🖨️ Export PDF / Print
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-container">
+
+    <!-- Hero Section: Modern Climate-Tech Dashboard -->
+    <section class="hero-section" aria-label="Project Overview">
+      <div class="hero-track-badge">
+        <span class="hero-pulse-dot"></span>
+        Track: Shital &amp; Sajag Bharat • Theme: Heat-resilient and alert India
+      </div>
+      <h2 class="hero-headline">
+        Understand Local Heat. <span>Prepare Earlier.</span>
+      </h2>
+      <p class="hero-subheadline">
+        HeatWise explores local temperature and heat-illness patterns to support evidence-informed alert-level research.
+        Because human physiological vulnerability and humidity profiles vary widely across Indian districts, candidate alert levels are evaluated against historical sentinel health data rather than one-size-fits-all assumptions.
+      </p>
+      <div class="hero-feature-chips">
+        <div class="hero-chip">
+          <span class="hero-chip-icon">📍</span>
+          <span>Micro-Climate Specificity</span>
+        </div>
+        <div class="hero-chip">
+          <span class="hero-chip-icon">🧪</span>
+          <span>70/30 Chronological Split</span>
+        </div>
+        <div class="hero-chip">
+          <span class="hero-chip-icon">⚖️</span>
+          <span>Correlation ≠ Causation</span>
+        </div>
+        <div class="hero-chip">
+          <span class="hero-chip-icon">🛡️</span>
+          <span>For Expert Review Only</span>
+        </div>
+        <div class="hero-chip">
+          <span class="hero-chip-icon">🔒</span>
+          <span>100% Client-Side Private</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Synthetic Data Evaluation Disclaimer Banner -->
+    <section id="syntheticDataBanner" class="synthetic-banner" aria-label="Data authenticity notice">
+      <div class="flex items-center gap-2">
+        <span class="text-blue-700 text-lg">ℹ️</span>
+        <div>
+          <strong>Synthetic Demonstration Mode:</strong> Currently viewing clearly labeled 
+          <span class="font-bold underline" id="bannerDistrictName">Ahmedabad</span> synthetic demonstration data for prototype evaluation.
+          No real patient hospital counts or fabricated clinical data are represented. All learned candidate alert levels are strictly 
+          <em>for expert review — not official alert thresholds.</em>
+        </div>
+      </div>
+      <button class="btn-preset bg-white" onclick="document.getElementById('csvFileInput').click()">
+        Upload Real District CSV
+      </button>
+    </section>
+
+    <!-- Uploaded Data Mode Banner -->
+    <section id="uploadedDataBanner" class="uploaded-banner hidden" aria-label="Uploaded data notice">
+      <div class="flex items-center gap-2">
+        <span class="text-emerald-700 text-lg">📁</span>
+        <div>
+          <strong>Custom Dataset Mode:</strong> Analyzing user-uploaded data from file: 
+          <span class="font-bold underline" id="uploadedFilenameLabel">data.csv</span>.
+          Historical weather and hospital illness records are matched by <code>district_id</code> and <code>date</code>.
+        </div>
+      </div>
+      <button class="btn-preset bg-white" onclick="HeatWiseApp.resetToDemoMode()">
+        Switch Back to Demo Districts
+      </button>
+    </section>
+
+    <!-- SECTION 2: District Selector & Date-Range Filter -->
+    <section class="control-bar-card" aria-label="Data filters and district selection">
+      <!-- Dataset Source Selection Bar -->
+      <div class="dataset-source-selector-bar">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Dataset Source:</span>
+            <div class="dataset-pill-group">
+              <button id="btnSourceExpanded" class="btn-source-pill active" title="Switch to the 180-day synthetic dataset with 4 fictional districts">
+                ⭐ Expanded 180-Day Synthetic Dataset (Fictional Districts)
+              </button>
+              <button id="btnSourceStandard" class="btn-source-pill" title="Switch to the 122-day regional demonstration library">
+                Regional Climate Demo (122 Days)
+              </button>
+              <button id="btnSourceUploaded" class="btn-source-pill" disabled title="Upload a custom CSV below to activate">
+                Custom Uploaded CSV <span id="uploadedSourceCount" class="badge-pill-count hidden">0</span>
+              </button>
+            </div>
+          </div>
+          <span class="text-xs text-slate-500 italic">Explicitly labelled SYNTHETIC DEMO DATA</span>
+        </div>
+      </div>
+
+      <div class="control-bar-grid">
+        <!-- District Selector -->
+        <div class="field-group">
+          <div class="flex items-center justify-between">
+            <label for="districtSelect" class="field-label">Select Observation District</label>
+            <span id="selectedDistrictRecordsPill" class="district-records-pill">180 observations available</span>
+          </div>
+          <select id="districtSelect" class="form-select">
+            <optgroup label="⭐ Expanded Synthetic Demo Dataset (180 Consecutive Days — Fictional Districts)" id="expandedDistrictsGroup">
+              <option value="DEMO_SYN_DIST_NORTH" selected>North Valley Basin (Fictional) — 180 observations (Arid Extreme Heat)</option>
+              <option value="DEMO_SYN_DIST_COAST">Coastal Haven (Fictional) — 180 observations (Maritime Humid Stress)</option>
+              <option value="DEMO_SYN_DIST_PLATEAU">Central Plateau (Fictional) — 180 observations (Continental Plateau Heat)</option>
+              <option value="DEMO_SYN_DIST_MILD">Upland Mild Basin (Fictional) — 180 observations (Zero Held-Out Surges Demo)</option>
+            </optgroup>
+            <optgroup label="Regional Climate Demo Library (122 Days)" id="demoDistrictsGroup">
+              <option value="DEMO_IND_GJ_AHM">Ahmedabad (Gujarat) — 122 observations (Arid / Semi-Arid Heat)</option>
+              <option value="DEMO_IND_OD_BHU">Bhubaneswar (Odisha) — 122 observations (Coastal Humid Heat Index)</option>
+              <option value="DEMO_IND_MH_NAG">Nagpur (Maharashtra) — 122 observations (Central Vidarbha Extreme Dry)</option>
+              <option value="DEMO_IND_DL_DEL">Delhi Central (NCR) — 122 observations (Northern Composite Urban Heat)</option>
+              <option value="DEMO_IND_SPARSE_TEST">Sparse Demo District — 14 observations (Guardrail Test)</option>
+            </optgroup>
+            <optgroup label="Uploaded Custom Districts" id="uploadedDistrictsGroup" class="hidden">
+              <!-- Dynamically populated from uploaded CSV districts -->
+            </optgroup>
+          </select>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-xs text-slate-500">Active Climate Zone:</span>
+            <span id="currentDistrictZone" class="zone-badge zone-amber">Arid / Semi-Arid</span>
+          </div>
+        </div>
+
+        <!-- Date Range Filter & Quick Presets -->
+        <div class="field-group">
+          <label class="field-label">Date-Range Observation Window</label>
+          <div class="date-inputs-row">
+            <input type="date" id="filterStartDate" class="form-input" aria-label="Start date">
+            <span class="text-slate-400 font-medium">to</span>
+            <input type="date" id="filterEndDate" class="form-input" aria-label="End date">
+          </div>
+          <div class="preset-buttons-row">
+            <button id="presetFullSeason" class="btn-preset">Full Summer Season</button>
+            <button id="presetPeakHeat" class="btn-preset">Peak Heatwave Window</button>
+            <button id="presetEarlySummer" class="btn-preset">Pre-Monsoon Ramp</button>
+            <button id="presetReset" class="btn-preset">Reset Range</button>
+          </div>
+        </div>
+
+        <!-- Analysis Metric Selector -->
+        <div class="field-group">
+          <label class="field-label">Primary Alert Variable</label>
+          <div class="metric-toggle-group">
+            <button id="btnMetricTemp" class="metric-btn active" title="Evaluate dry-bulb Maximum Temperature (°C)">
+              Max Temp (°C)
+            </button>
+            <button id="btnMetricHI" class="metric-btn" title="Evaluate apparent Steadman/Rothfusz Heat Index (°C) accounting for humidity">
+              Heat Index (°C)
+            </button>
+          </div>
+          <span class="text-xs text-slate-400 mt-1">Tip: Use Heat Index for coastal & humid districts.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 1: Overview Cards (5-Card Responsive Public Health Summary) -->
+    <section class="overview-cards-grid" aria-label="Key summary metrics">
+      <!-- Card 1: Selected District -->
+      <article class="overview-card">
+        <div class="card-top">
+          <span class="card-category">Selected District</span>
+          <span class="card-icon" style="background: #e0f2fe; color: #0284c7;">📍</span>
+        </div>
+        <div id="ovDistrictName" class="card-val-huge">Ahmedabad</div>
+        <div id="ovDistrictZone" class="text-xs font-medium text-slate-600 mt-1">Gujarat • Arid / Semi-Arid</div>
+        <div class="mt-2">
+          <span id="ovDistrictMeta" class="sample-stat-badge">Sample-data statistics (SYNTHETIC DEMO)</span>
+        </div>
+      </article>
+
+      <!-- Card 2: Number of Observations -->
+      <article class="overview-card">
+        <div class="card-top">
+          <span class="card-category">Observations</span>
+          <span class="card-icon" style="background: #fef3c7; color: #d97706;">📅</span>
+        </div>
+        <div id="ovDaysCount" class="card-val-huge">122</div>
+        <div id="ovDaysSub" class="text-xs font-medium text-slate-600 mt-1">Daily records evaluated</div>
+        <div class="mt-2">
+          <span id="ovDaysMeta" class="sample-stat-badge">Sample-data statistics (SYNTHETIC DEMO)</span>
+        </div>
+      </article>
+
+      <!-- Card 3: Temperature Summary -->
+      <article class="overview-card">
+        <div class="card-top">
+          <span class="card-category">Temperature Summary</span>
+          <span class="card-icon" style="background: #ffedd5; color: #ea580c;">🌡️</span>
+        </div>
+        <div class="temp-stat-summary-grid">
+          <div class="temp-stat-box">
+            <div id="ovTempSummaryPeak" class="temp-stat-num">--.-°C</div>
+            <div class="temp-stat-lbl">Peak Temp</div>
+          </div>
+          <div class="temp-stat-box">
+            <div id="ovTempSummaryMean" class="temp-stat-num">--.-°C</div>
+            <div class="temp-stat-lbl">Mean Temp</div>
+          </div>
+          <div class="temp-stat-box">
+            <div id="ovTempSummaryHI" class="temp-stat-num">--.-°C</div>
+            <div class="temp-stat-lbl">Peak HI</div>
+          </div>
+        </div>
+        <div class="mt-2">
+          <span id="ovTempMeta" class="sample-stat-badge">Sample-data statistics (SYNTHETIC DEMO)</span>
+        </div>
+      </article>
+
+      <!-- Card 4: Total Reported Heat-Illness Cases -->
+      <article class="overview-card">
+        <div class="card-top">
+          <span class="card-category">Reported Cases</span>
+          <span class="card-icon" style="background: #ccfbf1; color: #0d9488;">🏥</span>
+        </div>
+        <div id="ovCasesTotal" class="card-val-huge">1,482</div>
+        <div id="ovCasesSub" class="text-xs font-medium text-slate-600 mt-1">Avg: 12.1 cases/day across window</div>
+        <div class="mt-2">
+          <span id="ovCasesMeta" class="sample-stat-badge">Sample-data statistics (SYNTHETIC DEMO)</span>
+        </div>
+      </article>
+
+      <!-- Card 5: Data Quality Status -->
+      <article class="overview-card">
+        <div class="card-top">
+          <span class="card-category">Data Quality</span>
+          <span class="card-icon" style="background: #d1fae5; color: #059669;">🛡️</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="ovQualityStatus" class="badge-quality quality-optimal">Optimal</span>
+          <span id="ovQualityScore" class="font-mono text-base font-bold text-slate-800">98/100</span>
+        </div>
+        <div id="ovQualitySub" class="card-subtext">100% complete • 0 unit discrepancies</div>
+        <div class="mt-2">
+          <span id="ovQualityMeta" class="sample-stat-badge">Automated Informatics Audit</span>
+        </div>
+      </article>
+    </section>
+
+    <!-- SECTION: Geographical Heat Risk Map -->
+    <section class="dashboard-panel geomap-section-panel" aria-label="Geographical Heat Risk Map">
+      <div class="panel-header-flex">
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="panel-title">
+              <span>🗺️</span> Geographical Heat Risk Map
+            </h2>
+            <span class="sample-stat-badge">Leaflet &amp; GeoJSON District Polygons</span>
+          </div>
+          <p class="panel-subtitle">
+            Interactive district-level heat epidemiology choropleth across Indian agro-ecological zones. Click any district polygon or card to inspect telemetry.
+          </p>
+        </div>
+        <div class="geomap-header-badges flex items-center gap-2 flex-wrap">
+          <span class="zone-badge zone-teal" id="geomapWindowLabel">Full Season Window</span>
+          <span class="badge-quality badge-optimal">Real-Time Reactive</span>
+        </div>
+      </div>
+
+      <!-- Offline / Network Notice (Shown if tiles or Leaflet fail) -->
+      <div id="geomapOfflineNotice" class="geomap-offline-notice hidden">
+        ℹ️ Map tiles offline. Displaying high-precision vector choropleth map. Full interactive analysis active.
+      </div>
+
+      <!-- Non-geocoded uploaded districts warning banner -->
+      <div id="geomapNonGeocodedWarning" class="geomap-warning-banner hidden">
+        <div class="flex items-start gap-3">
+          <span class="text-xl">⚠️</span>
+          <div>
+            <div class="font-bold text-amber-900 text-sm">Non-Geocoded Uploaded District Detected</div>
+            <div id="geomapNonGeocodedText" class="text-xs text-amber-800 mt-0.5">
+              Uploaded district code does not match bundled geographical coordinates. Summary statistics remain available in the dashboard.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Indicator Selector Bar -->
+      <div class="geomap-controls-bar">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Display Indicator:</span>
+          <div class="geomap-indicator-group flex items-center gap-1.5 flex-wrap">
+            <button id="btnGeoMetricTemp" class="btn-geo-indicator active" type="button" title="Peak Maximum Temperature (°C)">
+              🌡️ Max Temp (°C)
+            </button>
+            <button id="btnGeoMetricHumidity" class="btn-geo-indicator" type="button" title="Mean Relative Humidity (%)">
+              💧 Humidity (%)
+            </button>
+            <button id="btnGeoMetricCases" class="btn-geo-indicator" type="button" title="Recorded Sentinel Heat-Illness Cases">
+              🏥 Heat-Illness Cases
+            </button>
+            <button id="btnGeoMetricAlert" class="btn-geo-indicator" type="button" title="Empirical Candidate Alert Category (Requires ≥30 days & surge validation)">
+              🚨 Candidate Alert Tier
+            </button>
+          </div>
+        </div>
+        <div class="geomap-metric-caption">
+          <span id="geomapMetricExplain" class="text-xs text-slate-600 italic">
+            Evaluates ambient dry-bulb peak maximum temperature exposure across observation days.
+          </span>
+        </div>
+      </div>
+
+      <!-- Main Map Grid (Map Canvas + Live Inspector Sidebar) -->
+      <div class="geomap-display-grid">
+        <!-- Map Canvas -->
+        <div class="geomap-canvas-wrapper">
+          <div id="geomap" class="geomap-leaflet-box" role="region" aria-label="Interactive District Map of India"></div>
+          
+          <!-- Legend Bar Overlay / Beneath Map -->
+          <div class="geomap-legend-bar">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Legend Scale:</span>
+            <div id="geomapLegendScale" class="geomap-legend-scale flex items-center gap-2 flex-wrap">
+              <!-- Dynamically populated by HeatWiseGeoMap.renderLegend() -->
+            </div>
+          </div>
+        </div>
+
+        <!-- District Inspector Sidebar -->
+        <aside class="geomap-inspector-aside" id="geomapInspectorCard" aria-label="District Inspector Card">
+          <div class="geomap-inspector-header">
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 id="geoInspectName" class="text-lg font-bold text-slate-900">Ahmedabad</h3>
+                <span id="geoInspectStatusBadge"><span class="zone-badge zone-teal">✓ Active In Dashboard</span></span>
+              </div>
+              <div id="geoInspectStateZone" class="text-xs text-slate-500 font-medium">Gujarat • Western Arid / Semi-Arid</div>
+            </div>
+          </div>
+
+          <!-- Selected Metric Hero Value Box -->
+          <div class="geomap-val-box">
+            <div class="flex items-center justify-between">
+              <span id="geoInspectMetricLabel" class="text-xs font-bold uppercase tracking-wider text-slate-600">Maximum Temperature</span>
+              <span class="text-xs font-semibold text-emerald-700">Observed Window</span>
+            </div>
+            <div id="geoInspectMetricValue" class="geomap-hero-metric">45.2°C</div>
+            <div id="geoInspectMetricSub" class="text-xs text-slate-500 mt-1">Evaluates ambient dry-bulb peak maximum temperature exposure.</div>
+          </div>
+
+          <!-- Micro Telemetry Grid -->
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <div class="geo-stat-pill">
+              <span class="geo-stat-lbl">Mean Max Temp</span>
+              <span id="geoInspectMeanTemp" class="geo-stat-val">41.8°C</span>
+            </div>
+            <div class="geo-stat-pill">
+              <span class="geo-stat-lbl">Mean Humidity</span>
+              <span id="geoInspectMeanHum" class="geo-stat-val">34.2%</span>
+            </div>
+            <div class="geo-stat-pill">
+              <span class="geo-stat-lbl">Total Heat Illness</span>
+              <span id="geoInspectTotalCases" class="geo-stat-val">1,248</span>
+            </div>
+            <div class="geo-stat-pill">
+              <span class="geo-stat-lbl">Peak Daily Cases</span>
+              <span id="geoInspectPeakCases" class="geo-stat-val">58/d</span>
+            </div>
+          </div>
+
+          <!-- Candidate Alert Review Tier -->
+          <div class="geo-alert-review-block mt-3">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Candidate Alert Level:</span>
+              <span id="geoInspectAlertTierBadge" class="badge-review badge-approved">Red Emergency Candidate (~45.0°C)</span>
+            </div>
+            <p id="geoInspectCandidateNote" class="text-xs text-slate-600 leading-relaxed">
+              Empirical candidate derived from 70% calibration window and tested on held-out 30% partition. For expert review — not an official alert threshold.
+            </p>
+          </div>
+
+          <!-- Data Provenance & Safety Notice -->
+          <div class="geo-provenance-box mt-3">
+            <div id="geoInspectProvenanceTitle" class="font-bold text-xs text-amber-900">⚠️ SYNTHETIC DEMO DATA</div>
+            <div id="geoInspectProvenanceText" class="text-xs text-amber-800 mt-0.5">
+              Synthetically generated observations for prototype demonstration. Not real hospital patient counts or official alert levels.
+            </div>
+          </div>
+
+          <!-- Action Button: Focus Dashboard -->
+          <div class="mt-4">
+            <button id="btnGeoLoadSelectedDistrict" class="btn-primary w-full text-center text-xs py-2" type="button">
+              Focus Dashboard on This District ↗
+            </button>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Quick District Selection Cards (Maintained for rapid comparison) -->
+      <div class="mt-6 pt-4 border-t border-slate-200">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <h4 class="text-sm font-bold text-slate-800">Quick District Selection Cards</h4>
+            <p class="text-xs text-slate-500">Compare regional vulnerability profiles at a glance and click to synchronize all charts.</p>
+          </div>
+          <span class="text-xs text-slate-500 italic">Click card to switch active district</span>
+        </div>
+        <div id="districtHeatmapGrid" class="district-heatmap-grid">
+          <!-- Dynamically rendered by HeatWiseApp.renderDistrictHeatmap() -->
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: CSV Upload Interface with Documented Required Columns -->
+    <section class="dashboard-panel" aria-label="CSV Upload and Ingestion">
+      <div class="panel-header-flex">
+        <div>
+          <h2 class="panel-title">
+            <span>📥</span> Data Ingestion & Custom District CSV Upload
+          </h2>
+          <p class="panel-subtitle">
+            Upload local sentinel hospital and meteorological records for your district to learn localized alert candidates.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="btnDownloadExpandedDemo" class="btn-preset text-xs font-semibold bg-amber-50 text-amber-900 border-amber-200" title="Download the 180-day multi-district synthetic demonstration CSV">
+            ⭐ Download 180-Day Dataset (CSV)
+          </button>
+          <button id="btnShowSchema" class="btn-subtle text-xs">
+            📋 View Required Columns Schema
+          </button>
+          <button id="btnDownloadTemplate" class="btn-primary text-xs">
+            ⬇️ Download Blank Template
+          </button>
+        </div>
+      </div>
+
+      <!-- Upload Zone -->
+      <div id="csvDropZone" class="upload-dropzone" onclick="document.getElementById('csvFileInput').click()">
+        <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display: none;">
+        <div class="upload-icon">📂</div>
+        <h3 class="text-sm font-semibold text-slate-800">
+          Drag & Drop district CSV here, or click to browse
+        </h3>
+        <p class="text-xs text-slate-500 mt-1">
+          Must contain required headers: 
+          <code class="code-badge">date</code>, 
+          <code class="code-badge">district_id</code>, 
+          <code class="code-badge">max_temp_c</code>, 
+          <code class="code-badge">humidity_pct</code>, 
+          <code class="code-badge">heat_illness_cases</code>
+        </p>
+      </div>
+
+      <!-- Dedicated Visible CSV Error Container -->
+      <div id="csvErrorBox" class="csv-error-box hidden" role="alert">
+        <div class="flex items-start gap-2">
+          <span class="text-red-600 text-lg">🚨</span>
+          <div class="w-full">
+            <h4 class="font-bold text-red-900 text-sm" id="csvErrorTitle">CSV Validation Errors Detected</h4>
+            <div class="text-xs text-red-800 mt-1" id="csvErrorMessage"></div>
+            <div id="csvErrorList" class="mt-2 text-xs font-mono bg-white p-2 border border-red-200 rounded max-h-48 overflow-y-auto space-y-1"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success Notification Box -->
+      <div id="csvSuccessBox" class="csv-success-box hidden" role="status">
+        <div class="flex items-center justify-between">
+          <div>
+            <strong class="text-emerald-900">Upload Successful:</strong> 
+            <span id="csvSuccessDetails" class="text-emerald-800"></span>
+          </div>
+          <button class="btn-action-sm" onclick="document.getElementById('csvSuccessBox').classList.add('hidden')">Dismiss</button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between mt-3 text-xs text-slate-500 flex-wrap gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span>Preset Test Datasets:</span>
+          <button id="btnLoadExpandedDirect" class="text-amber-800 font-semibold underline hover:text-amber-950">
+            ⭐ Load 180-Day Dataset (3+ Fictional Districts)
+          </button>
+          <span class="text-slate-300">•</span>
+          <button id="btnLoadTemplateIssues" class="text-blue-600 underline font-medium hover:text-blue-800">
+            Load Sample with Quality Issues
+          </button>
+        </div>
+        <span class="text-slate-400">Weather & health counts are matched strictly by district and date</span>
+      </div>
+    </section>
+
+    <!-- SECTION 4: Interactive Weather vs Heat-Illness Chart -->
+    <section class="dashboard-panel" aria-label="Time series chart">
+      <div class="panel-header-flex">
+        <div>
+          <h2 class="panel-title">
+            <span>📈</span> Historical Weather Measurements vs Hospital Heat-Illness Admissions
+          </h2>
+          <p class="panel-subtitle">
+            Synchronized dual-axis comparison of ambient thermal exposure against emergency presentations over time.
+          </p>
+        </div>
+        <div class="chart-toggles-bar">
+          <label class="chart-toggle-item">
+            <input type="checkbox" id="toggleChartTemp" checked>
+            <span style="color: #d97706; font-weight: 600;">Max Temp (°C)</span>
+          </label>
+          <label class="chart-toggle-item">
+            <input type="checkbox" id="toggleChartHI" checked>
+            <span style="color: #ef4444; font-weight: 600;">Heat Index (°C)</span>
+          </label>
+          <label class="chart-toggle-item">
+            <input type="checkbox" id="toggleChartHum" checked>
+            <span style="color: #06b6d4; font-weight: 600;">Humidity (%)</span>
+          </label>
+          <label class="chart-toggle-item">
+            <input type="checkbox" id="toggleChartCases" checked>
+            <span style="color: #0d9488; font-weight: 600;">Heat Illness Cases (Bars)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Dynamic Chart Metadata Banner -->
+      <div class="chart-info-banner">
+        <div>
+          <span class="text-slate-500">Active District Dataset:</span> 
+          <strong id="chartActiveDistrictBadge" class="text-slate-800 font-mono">Ahmedabad (IND_GJ_AHM)</strong>
+        </div>
+        <div>
+          <span class="text-slate-500">Selected Date Range:</span> 
+          <strong id="chartDateRangeBadge" class="text-slate-800 font-mono">2024-04-01 to 2024-07-31</strong> 
+          (<span id="chartPointsCountBadge">122</span> days plotted)
+        </div>
+        <div>
+          <span class="text-slate-500">Units:</span> 
+          <span class="badge-quality quality-acceptable">Temp/HI: °C</span>
+          <span class="badge-quality quality-acceptable">RH: %</span>
+          <span class="badge-quality quality-optimal">Cases: Count/Day</span>
+        </div>
+      </div>
+
+      <!-- Time Series Canvas -->
+      <div class="chart-container-large">
+        <canvas id="timeSeriesChart"></canvas>
+      </div>
+
+      <div class="flex items-center justify-between text-xs text-slate-500 mt-2 px-1 flex-wrap gap-2">
+        <div>
+          <span>Dashed horizontal lines represent </span>
+          <strong class="text-slate-700">Candidate Alert Thresholds</strong>
+          <span> (Yellow, Orange, Red) calibrated to historical surge points.</span>
+        </div>
+        <div class="font-mono text-xs text-slate-400">
+          Source: Hospital Sentinel ER Submissions & IMD Observational Metrics
+        </div>
+      </div>
+    </section>
+
+    <!-- CREATIVE FEATURE 1: Interactive Candidate Sensitivity Explorer / Threshold What-If Simulator -->
+    <section class="whatif-simulator-card" aria-label="Interactive Threshold Simulator">
+      <div class="panel-header-flex">
+        <div>
+          <h2 class="panel-title">
+            <span>⚡</span> Interactive Candidate Sensitivity Explorer (What-If Simulator)
+          </h2>
+          <p class="panel-subtitle">
+            Simulate public-health impact: test any custom trigger temperature against the active district's historical observations.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="sample-stat-badge">Dynamic Empirical Simulation</span>
+        </div>
+      </div>
+
+      <div class="whatif-slider-container">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <label for="whatIfSlider" class="text-xs font-bold uppercase tracking-wider text-slate-700">
+            Candidate Test Threshold: <span id="whatIfSliderVal" class="text-base font-mono font-bold text-amber-700">42.0°C</span>
+          </label>
+          <span class="text-xs text-slate-500">Slide to evaluate alert volume vs surge capture on active data</span>
+        </div>
+        <input type="range" id="whatIfSlider" class="whatif-range-slider" min="32" max="48" step="0.5" value="42.0">
+        <div class="flex justify-between text-xs text-slate-400 font-mono mt-1">
+          <span>32.0°C (Sensitive)</span>
+          <span>40.0°C (Moderate)</span>
+          <span>48.0°C (Specific)</span>
+        </div>
+      </div>
+
+      <div class="whatif-metrics-grid">
+        <div class="whatif-metric-box">
+          <div id="whatIfDaysTriggered" class="whatif-metric-val">--</div>
+          <div class="whatif-metric-lbl">Alert Days Triggered</div>
+          <div id="whatIfPctDays" class="text-xs text-slate-400 mt-0.5">--% of window</div>
+        </div>
+        <div class="whatif-metric-box">
+          <div id="whatIfSensitivity" class="whatif-metric-val">--%</div>
+          <div class="whatif-metric-lbl">Surge Days Caught (Sens)</div>
+          <div id="whatIfSurgesFound" class="text-xs text-slate-400 mt-0.5">--/-- surge events</div>
+        </div>
+        <div class="whatif-metric-box">
+          <div id="whatIfSpecificity" class="whatif-metric-val">--%</div>
+          <div class="whatif-metric-lbl">Normal Days Safe (Spec)</div>
+          <div id="whatIfBaselineClean" class="text-xs text-slate-400 mt-0.5">--/-- normal days</div>
+        </div>
+        <div class="whatif-metric-box">
+          <div id="whatIfFalseAlertRate" class="whatif-metric-val">--%</div>
+          <div class="whatif-metric-lbl">False Discovery Rate</div>
+          <div id="whatIfFalseAlertsCount" class="text-xs text-slate-400 mt-0.5">Alerts on non-surge days</div>
+        </div>
+      </div>
+      <div class="mt-2 text-xs text-slate-500 italic">
+        * Computed dynamically from the currently selected dataset and date range. Correlation does not establish clinical causation.
+      </div>
+    </section>
+
+    <!-- SEASONAL DAILY HEATMAP MATRIX -->
+    <section class="calendar-heatmap-panel" aria-label="Daily Observation Calendar Heatmap">
+      <div class="heatmap-controls-row">
+        <div>
+          <h2 class="panel-title">
+            <span>🗓️</span> Seasonal Daily Thermal &amp; Epidemiological Heatmap Matrix
+          </h2>
+          <p class="panel-subtitle">
+            Day-by-day continuous matrix of summer environmental exposure and hospital presentations for <strong id="calendarDistrictName">Ahmedabad</strong>.
+          </p>
+        </div>
+        <div class="heatmap-toggle-group">
+          <button id="btnHeatmapTemp" class="btn-heatmap-toggle active" title="Color by Dry-Bulb Maximum Temperature (°C)">
+            Max Temp (°C)
+          </button>
+          <button id="btnHeatmapHI" class="btn-heatmap-toggle" title="Color by Apparent Heat Index (°C)">
+            Heat Index (°C)
+          </button>
+          <button id="btnHeatmapCases" class="btn-heatmap-toggle" title="Color by Hospital Heat-Illness Cases">
+            Hospital Cases
+          </button>
+          <button id="btnHeatmapAlerts" class="btn-heatmap-toggle" title="Color by Candidate Alert Exceedances">
+            Alert Tiers
+          </button>
+        </div>
+      </div>
+
+      <!-- Calendar Months Container (Populated dynamically) -->
+      <div id="calendarHeatmapContainer" class="calendar-heatmap-months-container">
+        <!-- Rendered by HeatWiseApp.renderCalendarHeatmap() -->
+      </div>
+
+      <!-- Day Inspector Banner -->
+      <div id="dayInspectorBanner" class="day-inspector-card">
+        <div class="flex items-center gap-3">
+          <span class="text-xl">🔍</span>
+          <div>
+            <strong id="inspectorDate" class="text-slate-900 font-mono">Select a day cell above to inspect</strong>
+            <div id="inspectorDetails" class="text-xs text-slate-600 mt-0.5">Hover or click any calendar square to review exact meteorological and clinical values.</div>
+          </div>
+        </div>
+        <div id="inspectorAlertBadge">
+          <span class="zone-badge zone-gray">No Day Selected</span>
+        </div>
+      </div>
+
+      <!-- Heatmap Legend & Scale -->
+      <div class="heatmap-legend-bar">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-xs uppercase tracking-wider text-slate-700">Thermal Scale:</span>
+          <div id="heatmapLegendSwatches" class="heatmap-legend-scale">
+            <!-- Dynamic swatches generated by JS -->
+          </div>
+        </div>
+        <span class="text-xs text-slate-500 italic">* Hover for date telemetry; click to pin day briefing</span>
+      </div>
+
+      <!-- Heatmap Summary Stats Strip -->
+      <div class="heatmap-stats-strip">
+        <div class="heatmap-stat-box">
+          <div id="heatStatExtremeDays" class="heatmap-stat-val">--</div>
+          <div class="heatmap-stat-lbl">Days &ge; 42°C (Extreme Heat)</div>
+        </div>
+        <div class="heatmap-stat-box">
+          <div id="heatStatPeakTemp" class="heatmap-stat-val">--.-°C</div>
+          <div id="heatStatPeakTempDate" class="heatmap-stat-lbl">Peak Temp Date</div>
+        </div>
+        <div class="heatmap-stat-box">
+          <div id="heatStatSurgeDays" class="heatmap-stat-val">--</div>
+          <div class="heatmap-stat-lbl">Hospital Surge Days</div>
+        </div>
+        <div class="heatmap-stat-box">
+          <div id="heatStatPeakCases" class="heatmap-stat-val">--</div>
+          <div id="heatStatPeakCasesDate" class="heatmap-stat-lbl">Peak Hospital Admissions</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 5: Analysis Panel & SECTION 7: Shared Report Export Feature -->
+    <div class="dashboard-main-grid">
+      <section class="dashboard-panel" style="margin-bottom: 0;" aria-label="Statistical Analysis Panel">
+        <div class="panel-header-flex">
+          <div>
+            <h2 class="panel-title">
+              <span>🔬</span> Epidemiological Relationship & Candidate Calibration Analysis
+            </h2>
+            <p class="panel-subtitle">
+              Transparent statistical method with held-out historical validation.
+            </p>
+          </div>
+        </div>
+
+        <div id="analysisContent"></div>
+
+        <div class="mt-4 pt-4 border-t border-slate-200">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+            Thermal Bracket Risk Distribution (Dose-Response Curve)
+          </h3>
+          <div style="height: 220px; width: 100%;">
+            <canvas id="doseResponseChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard-panel" style="margin-bottom: 0;" aria-label="Export and Inter-agency Sharing">
+        <div class="panel-header-flex">
+          <div>
+            <h2 class="panel-title">
+              <span>📢</span> Shared Inter-Agency Reporting
+            </h2>
+            <p class="panel-subtitle">
+              Multi-stakeholder export for Health Departments (CMO) and Disaster Authorities (SDMA / DDMA).
+            </p>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Distribute learned candidate alert evaluations to district collectors, disaster management officers, and sentinel health centers.
+          </p>
+
+          <button id="btnDownloadFullReport" class="btn-primary w-full justify-center">
+            📄 Download Full Evaluation Report (.html)
+          </button>
+          <button id="btnExportJson" class="btn-subtle w-full justify-center">
+            💾 Download Full JSON Evaluation Audit
+          </button>
+          <button id="btnCopySitrep" class="btn-subtle w-full justify-center">
+            📋 Copy Situation Report Briefing
+          </button>
+          <button onclick="window.print()" class="btn-subtle w-full justify-center">
+            🖨️ Print / Save Official PDF Report
+          </button>
+
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600">
+            <strong>Target Stakeholders:</strong>
+            <ul class="list-disc list-inside mt-1 space-y-1">
+              <li>Chief Medical Officer (CMO) & ER Supervisors</li>
+              <li>State / District Disaster Management Authorities (SDMA / DDMA)</li>
+              <li>Municipal Corporation Heat Action Plan (HAP) Committees</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- SECTION 6: Candidate Review Table -->
+    <section class="dashboard-panel mt-6" aria-label="Candidate Alert Level Review Table">
+      <div class="panel-header-flex">
+        <div>
+          <h2 class="panel-title">
+            <span>📋</span> Candidate Alert Levels for Expert Public Health Review
+          </h2>
+          <p class="panel-subtitle">
+            Empirical candidates derived through percentile risk surge modeling and tested on held-out historical data.
+          </p>
+        </div>
+        <div class="expert-disclaimer-pill font-bold">
+          ⚠️ For expert review — not an official alert threshold
+        </div>
+      </div>
+
+      <div id="candidateEmptyNotice" class="hidden">
+        <div class="empty-state-guardrail">
+          <div class="empty-state-icon">⚠️</div>
+          <h3 class="empty-state-title" id="candidateEmptyText">
+            Insufficient evidence for a candidate.
+          </h3>
+          <p class="empty-state-desc" id="candidateEmptySubText">
+            To prevent medically unsupported or statistically unstable threshold suggestions, HeatWise requires at least 30 observation days, multiple documented surge events, and adequate held-out validation data.
+          </p>
+        </div>
+      </div>
+
+      <div id="candidateTableContainer" class="candidate-table-wrap">
+        <table class="table-candidate">
+          <thead>
+            <tr>
+              <th>Alert Tier</th>
+              <th>Candidate Value</th>
+              <th>Statistical Evidence</th>
+              <th>Sample Split</th>
+              <th>Held-Out Validation Performance</th>
+              <th>Uncertainty (95% CI)</th>
+              <th>Review Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="candidateTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded text-xs text-slate-500 flex items-center justify-between flex-wrap gap-2">
+        <span>Validation metrics: <strong>Sens</strong> (Sensitivity on held-out surge days), <strong>Spec</strong> (Specificity on held-out normal days), <strong>PPV</strong> (Positive Predictive Value), <strong>J</strong> (Youden's Index).</span>
+        <span class="font-medium text-amber-700">All tiers are subject to clinician annotation & local HAP adaptation.</span>
+      </div>
+    </section>
+
+    <!-- CREATIVE FEATURE 2: Local Heat-Resilience Action Matrix (Track: Shital & Sajag Bharat) -->
+    <section class="action-matrix-section" aria-label="Local Action Matrix">
+      <div class="panel-header-flex">
+        <div>
+          <h2 class="panel-title">
+            <span>🛡️</span> Local Heat-Resilience Action Matrix • Shital &amp; Sajag Bharat
+          </h2>
+          <p class="panel-subtitle">
+            Evidence-informed civic and clinical preparedness protocol mapping candidate alert thresholds to municipal interventions.
+          </p>
+        </div>
+        <div class="expert-disclaimer-pill font-bold">
+          🏛️ NDMA / Heat Action Plan Guidelines
+        </div>
+      </div>
+
+      <div class="action-matrix-grid">
+        <!-- Tier 1: Yellow Early Watch -->
+        <div class="action-tier-card action-tier-yellow">
+          <div>
+            <div class="action-tier-header">
+              <span class="action-tier-name">
+                <span class="alert-indicator-dot dot-yellow"></span> Yellow Early Watch
+              </span>
+              <span id="actionThreshYellow" class="action-tier-thresh bg-amber-50 text-amber-900 border border-amber-200">
+                ~41.5°C
+              </span>
+            </div>
+            <p class="text-xs text-slate-600 mb-2"><strong>Trigger Condition:</strong> 80th percentile risk elevation or first summer inflection point.</p>
+            <ul class="action-list">
+              <li><span class="bullet">▸</span> <strong>ORS Kiosks:</strong> Activate oral rehydration points at transit hubs and anganwadi centers.</li>
+              <li><span class="bullet">▸</span> <strong>Labor Advisory:</strong> Issue hydration reminders to construction sites and agricultural cooperatives.</li>
+              <li><span class="bullet">▸</span> <strong>Early Triage:</strong> Alert primary health centers (PHCs) to stock oral electrolytes and ice packs.</li>
+            </ul>
+          </div>
+          <div class="text-xs font-semibold text-amber-800 mt-2 pt-2 border-t border-slate-100">
+            Target Focus: Community Awareness &amp; Vulnerable Population Hydration
+          </div>
+        </div>
+
+        <!-- Tier 2: Orange Alert -->
+        <div class="action-tier-card action-tier-orange">
+          <div>
+            <div class="action-tier-header">
+              <span class="action-tier-name">
+                <span class="alert-indicator-dot dot-orange"></span> Orange Alert
+              </span>
+              <span id="actionThreshOrange" class="action-tier-thresh bg-orange-50 text-orange-900 border border-orange-200">
+                ~43.5°C
+              </span>
+            </div>
+            <p class="text-xs text-slate-600 mb-2"><strong>Trigger Condition:</strong> 90th percentile moderate surge threshold.</p>
+            <ul class="action-list">
+              <li><span class="bullet">▸</span> <strong>Cooling Shelters:</strong> Open air-cooled municipal community halls, bus depots, and religious shrines.</li>
+              <li><span class="bullet">▸</span> <strong>Work Hours Shift:</strong> Mandatory work stoppage for outdoor manual laborers between 12:00 PM and 4:00 PM.</li>
+              <li><span class="bullet">▸</span> <strong>Emergency Ward Preps:</strong> Pre-fill ice packs and cold intravenous normal saline packs in casualty wards.</li>
+            </ul>
+          </div>
+          <div class="text-xs font-semibold text-orange-800 mt-2 pt-2 border-t border-slate-100">
+            Target Focus: Exposure Reduction &amp; Hospital Emergency Capacity
+          </div>
+        </div>
+
+        <!-- Tier 3: Red Severe Emergency -->
+        <div class="action-tier-card action-tier-red">
+          <div>
+            <div class="action-tier-header">
+              <span class="action-tier-name">
+                <span class="alert-indicator-dot dot-red"></span> Red Severe Emergency
+              </span>
+              <span id="actionThreshRed" class="action-tier-thresh bg-red-50 text-red-900 border border-red-200">
+                ~45.0°C
+              </span>
+            </div>
+            <p class="text-xs text-slate-600 mb-2"><strong>Trigger Condition:</strong> 95th percentile acute surge crisis threshold.</p>
+            <ul class="action-list">
+              <li><span class="bullet">▸</span> <strong>Water Tanker Fleets:</strong> Deploy emergency drinking water tankers to high-density informal settlements.</li>
+              <li><span class="bullet">▸</span> <strong>Power Outage Moratorium:</strong> Prohibit scheduled utility power cuts to maintain domestic fans and cooling.</li>
+              <li><span class="bullet">▸</span> <strong>Inter-Agency Command:</strong> Activate District Magistrate (DM) emergency heat response cell and 108 ambulance redeployment.</li>
+            </ul>
+          </div>
+          <div class="text-xs font-semibold text-red-800 mt-2 pt-2 border-t border-slate-100">
+            Target Focus: Critical Life Support &amp; Disaster Management Escalation
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 8: Data-Quality Panel -->
+    <section class="dashboard-panel mt-6" aria-label="Data Quality Audit Panel">
+      <div class="panel-header-flex">
+        <div>
+          <h2 class="panel-title">
+            <span>🛡️</span> Data Quality & Health Informatics Audit
+          </h2>
+          <p class="panel-subtitle">
+            Automated screening for missing values, unit inconsistencies (°F vs °C), out-of-bound humidity, and sample adequacy.
+          </p>
+        </div>
+      </div>
+
+      <div id="dataQualityContainer"></div>
+    </section>
+
+  </main>
+
+  <div id="reviewModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal-card" id="reviewModalContent"></div>
+  </div>
+
+  <div id="schemaModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal-card" id="schemaModalContent"></div>
+  </div>
+
+  <div id="appToast" class="app-toast"></div>
+
+  <!-- Scripts -->
+  <script src="/static/js/syntheticData.js"></script>
+  <script src="/static/js/analytics.js"></script>
+  <script src="/static/js/charts.js"></script>
+  <script src="/static/js/dataQuality.js"></script>
+  <script src="/static/js/geoData.js"></script>
+  <script src="/static/js/geomap.js"></script>
+  <script src="/static/js/app.js"></script>
+
+</body>
+</html>
